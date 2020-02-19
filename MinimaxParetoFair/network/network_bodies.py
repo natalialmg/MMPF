@@ -1,0 +1,123 @@
+
+from .network_utils import *
+
+class ConvStackBody(nn.Module):
+    def __init__(self, in_channels=4, in_w=32, in_h=32,
+                 kernels=[3,3,3,3], features=[32,32,32,32], strides=[2,2,2,2],pads=None,gate=F.elu,
+                 use_dropout=False, dropout_p=0.5,
+                 use_batchnorm=False):
+                #NatureConv equivalent is kernels=[8,4,3], features=[32,64,64], strides=[4,2,1]
+        super(ConvStackBody, self).__init__()
+        if pads is None:
+            pads =[0 for _ in range(len(strides))]
+
+
+        self.gate=gate
+        expanded_features = [in_channels]+features
+        h_w = (in_w, in_h)
+        self.convs = nn.ModuleList()
+        self.regs = nn.ModuleList()
+        for _ in range(len(kernels)):
+            self.convs.append(layer_init(nn.Conv2d(
+                                expanded_features[_], expanded_features[_+1],
+                                kernel_size=kernels[_], stride=strides[_],padding=pads[_]
+            )))
+            if use_dropout:
+                self.regs.append(nn.Dropout2d(p=dropout_p))
+            elif use_batchnorm:
+                self.regs.append(nn.BatchNorm2d(expanded_features[_+1]))
+            else:
+                self.regs.append(nn.Identity())
+        for _ in range(len(kernels)):
+            h_w = conv_output_shape(h_w, kernel_size=kernels[_], stride=strides[_], pad=pads[_])
+        self.feature_dim= h_w[0]*h_w[1]*features[-1]
+
+    def forward(self, x):
+        for l, conv in enumerate(self.convs):
+            reg = self.regs[l]
+            x = self.gate(reg(conv(x)))
+
+        x = x.view(x.size(0), -1)
+        return x
+
+
+class FCBody(nn.Module):
+    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu):
+        super(FCBody, self).__init__()
+        dims = (state_dim,) + hidden_units
+        self.layers = nn.ModuleList(
+            [layer_init(nn.Linear(dim_in, dim_out)) for dim_in, dim_out in zip(dims[:-1], dims[1:])])
+        self.gate = gate
+        self.feature_dim = dims[-1]
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = self.gate(layer(x))
+        return x
+
+class FCBody_v2(nn.Module):
+    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu, use_batchnorm=True):
+        super(FCBody_v2, self).__init__()
+        dims = (state_dim,) + hidden_units
+        self.layers = nn.ModuleList()
+        self.regs = nn.ModuleList()
+        for _ in range(len(dims) - 1):
+            self.layers.append(layer_init(nn.Linear(dims[_], dims[_ + 1])))
+            if use_batchnorm:
+                self.regs.append(nn.BatchNorm1d(dims[_ + 1]))
+            else:
+                self.regs.append(nn.Identity())
+        self.gate = gate
+        self.feature_dim = dims[-1]
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            reg = self.regs[i]
+            x = self.gate(reg(layer(x)))
+
+        return x
+
+class FCResnetLayer(nn.Module):
+    def __init__(self, state_dim, hidden_unit=64, gate=F.relu, residual_depth=None):
+        super(FCResnetLayer, self).__init__()
+        if residual_depth is None:
+            residual_depth = 1
+        self.gate = gate
+        self.layers = nn.ModuleList(
+            [layer_init(nn.Linear(state_dim, hidden_unit))])
+        for _ in range(residual_depth - 1):
+            self.layers.extend([layer_init(nn.Linear(hidden_unit,hidden_unit))])
+
+    def forward(self, x):
+        y = x = self.layers[0](x)
+        for layer in self.layers[1:]:
+            y = layer(self.gate(y))
+        return x + y
+
+class FCResnetBody(nn.Module):
+    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu, residual_depth=1):
+        super(FCResnetBody, self).__init__()
+        dims = (state_dim,) + hidden_units
+        self.layers = nn.ModuleList(
+            [FCResnetLayer(state_dim=dim_in, hidden_unit=dim_out, gate=gate, residual_depth=residual_depth)
+             for dim_in, dim_out in zip(dims[:-1], dims[1:])])
+        self.gate = gate
+        self.feature_dim = dims[-1]
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = self.gate(layer(x))
+        return x
+
+
+
+
+
+
+class DummyBody(nn.Module):
+    def __init__(self, state_dim):
+        super(DummyBody, self).__init__()
+        self.feature_dim = state_dim
+
+    def forward(self, x):
+        return x
