@@ -1,9 +1,9 @@
 import numpy as np
-from torch_utils import *
 import torch
 from torch import optim
-from misc import *
-from losses import *
+from .misc import *
+from .losses import *
+from .torch_utils import *
 import pandas as pd
 
 

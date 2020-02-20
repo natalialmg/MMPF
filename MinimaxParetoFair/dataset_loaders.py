@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
-from . import *
-import sys
+# from . import *
+import sys, os
 sys.path.append(".")
 sys.path.append("..")
-# from MinimaxParetoFair.network import *
+from MinimaxParetoFair.network import *
 
 import torchvision
 import torch
@@ -16,17 +16,17 @@ from torchvision import models
 from ast import literal_eval as make_tuple
 
 
-
 ## MIMIC ##
 def load_mimic(split = None):
+    dirname = os.path.dirname(__file__)
     if split is None:
-        train_pd = pd.read_pickle('/data/MIMIC/train_mimic_database.pkl')
-        test_pd = pd.read_pickle('/data/MIMIC/test_mimic_database.pkl')
-        val_pd = pd.read_pickle('/data/MIMIC/val_mimic_database.pkl')
+        train_pd = pd.read_pickle(os.path.join(dirname,'/MIMIC/train_mimic_database.pkl'))
+        test_pd = pd.read_pickle(os.path.join(dirname,'/MIMIC/test_mimic_database.pkl'))
+        val_pd = pd.read_pickle(os.path.join(dirname,'/MIMIC/val_mimic_database.pkl'))
     else:
-        train_pd = pd.read_pickle('/data/MIMIC/train_mimic_database_{:d}.pkl'.format(split))
-        test_pd = pd.read_pickle('/data/MIMIC/test_mimic_database_{:d}.pkl'.format(split))
-        val_pd = pd.read_pickle('/data/MIMIC/val_mimic_database_{:d}.pkl'.format(split))
+        train_pd = pd.read_pickle(os.path.join(dirname,'/MIMIC/train_mimic_database_{:d}.pkl'.format(split)))
+        test_pd = pd.read_pickle(os.path.join(dirname,'/MIMIC/test_mimic_database_{:d}.pkl'.format(split)))
+        val_pd = pd.read_pickle(os.path.join(dirname,'/MIMIC/val_mimic_database_{:d}.pkl'.format(split)))
 
 
     tag = 'age'
@@ -178,9 +178,10 @@ def get_dataloaders_mimic(config, sampler=True, secret_tag='combined', utility_t
 
 ## HAM ##
 def load_HAM():
-    test_pd = pd.read_pickle('/data/HAM100000/prelim_kaggle_test_data.pkl')
-    train_pd = pd.read_pickle('/data/HAM100000/prelim_kaggle_train_data.pkl')
-    val_pd = pd.read_pickle('/data/HAM100000/prelim_kaggle_val_data.pkl')
+    dirname = os.path.dirname(__file__)
+    test_pd = pd.read_pickle(os.path.join(dirname,'/HAM100000/prelim_kaggle_test_data.pkl'))
+    train_pd = pd.read_pickle(os.path.join(dirname,'/HAM100000/prelim_kaggle_train_data.pkl'))
+    val_pd = pd.read_pickle(os.path.join(dirname,'/HAM100000/prelim_kaggle_val_data.pkl'))
 
     return train_pd, val_pd, test_pd
 
@@ -260,17 +261,18 @@ def get_dataloaders_HAM(config, sampler=True, secret_tag='cell_type_idx',
 
 ## GERMAN ##
 def load_german(split=None):
+    dirname = os.path.dirname(__file__)
     if split is None:
-        train_pd = pd.read_csv('./datasets/german/train.csv').drop(columns='Unnamed: 0', axis=1)
-        test_pd = pd.read_csv('./datasets/german/test.csv').drop(columns='Unnamed: 0', axis=1)
-        val_pd = pd.read_csv('./datasets/german/val.csv').drop(columns='Unnamed: 0', axis=1)
+        train_pd = pd.read_csv(os.path.join(dirname,'./datasets/german/train.csv')).drop(columns='Unnamed: 0', axis=1)
+        test_pd = pd.read_csv(os.path.join(dirname,'./datasets/german/test.csv')).drop(columns='Unnamed: 0', axis=1)
+        val_pd = pd.read_csv(os.path.join(dirname,'./datasets/german/val.csv')).drop(columns='Unnamed: 0', axis=1)
     else:
-        train_pd = pd.read_csv('./datasets/german/train_' + str(split) + '.csv').drop(columns='Unnamed: 0',
-                                                                                                axis=1)
-        test_pd = pd.read_csv('./datasets/german/test_' + str(split) + '.csv').drop(columns='Unnamed: 0',
-                                                                                              axis=1)
-        val_pd = pd.read_csv('./datasets/german/val_' + str(split) + '.csv').drop(columns='Unnamed: 0',
-                                                                                            axis=1)
+        train_pd = pd.read_csv(
+          os.path.join(dirname,'./datasets/german/train_{:d}.csv'.format(split))).drop(columns='Unnamed: 0', axis=1)
+        test_pd = pd.read_csv(
+          os.path.join(dirname,'./datasets/german/test_{:d}.csv'.format(split))).drop(columns='Unnamed: 0', axis=1)
+        val_pd = pd.read_csv(
+          os.path.join(dirname,'./datasets/german/val_{:d}_{:d}.csv'.format(split))).drop(columns='Unnamed: 0', axis=1)
 
     tags = ['sex-age', 'sex', 'age', 'month', 'credit']
     for t in tags:
@@ -279,8 +281,6 @@ def load_german(split=None):
         test_pd[t + '_cat'] = pd.Categorical(test_pd[t]).codes
 
     col_tags = list(train_pd.columns)
-
-    ##for german
     remove_tags = ['sex-age', 'sex', 'age', 'sex-age_cat', 'sex_cat', 'age_cat', 'credit', 'credit_cat']
     for rm in remove_tags:
         col_tags.remove(rm)
@@ -397,9 +397,6 @@ def load_adult(split=None):
         test_pd[t + '_cat'] = pd.Categorical(test_pd[t]).codes
 
     col_tags = list(train_pd.columns)
-
-    ##for german
-    col_tags = list(train_pd.columns)
     remove_tags = ['race', 'sex', 'race-sex', 'race_cat', 'sex_cat',
                    'race-sex_cat', 'income-per-year', 'income-per-year_cat']
     for rm in remove_tags:
@@ -463,7 +460,7 @@ def load_adult(split=None):
     return train_pd, val_pd, test_pd, col_tags
 
 def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_tag='income-per-year_cat',
-                          balanced_tag='sex_cat',shuffle_train=True,shuffle_val = True,resnet = False):
+                          balanced_tag='sex_cat',shuffle_train=True,shuffle_val = True,resnet = True):
     from .misc import get_weight_dict
     train_pd, val_pd, test_pd, col_tags = load_adult(split=config.split)
 
@@ -517,7 +514,7 @@ def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_ta
                                                          transform=composed),
                                       batch_size=config.BATCH_SIZE,
                                       shuffle=shuffle_train, num_workers=config.n_dataloader, pin_memory=True)
-        print('NO SAMPLER!')
+        print('Not using balanced sampling!')
 
     val_dataloader = DataLoader(TablePandasDataset(pd=val_pd, cov_list=config.cov_tags,
                                                    utility_tag='utility_cat', sensitive_tag='secret_cat',
@@ -534,8 +531,8 @@ def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_ta
     ## NETWORK ##
     # torch.manual_seed(config.seed)
     if config.shidden == '' :
-        hidden_units = ()
-        config.shidden = '()'
+        hidden_units = (512,512)
+        config.shidden = '(512,512)'
     else:
         hidden_units = make_tuple(config.shidden)
 
@@ -584,3 +581,31 @@ def get_dataloaders(config, *args,**kwargs):
         raise NotImplementedError
 
     return dl(config, *args,**kwargs)
+
+
+def get_datasets(config):
+  secret_tag = 'combined'
+  utility_tag = 'utility'
+  balanced_tag = 'combined'
+  if config.dataset == 'mimic':
+    dl = load_mimic
+  elif config.dataset == 'adult_gender':
+    dl = load_adult
+    secret_tag = 'sex_cat'
+    utility_tag = 'income-per-year_cat'
+  elif config.dataset == 'adult_malewhite':
+    dl = load_adult
+    secret_tag = 'combined'
+    utility_tag='income-per-year_cat'
+  elif config.dataset == 'adult_race_gender':
+    dl = load_adult
+    secret_tag = 'race_sex_cat'
+    utility_tag = 'income-per-year_cat'
+  elif config.dataset == 'german':
+    dl = load_german
+  elif config.dataset == 'HAM':
+    dl = load_HAM
+  else:
+    raise NotImplementedError
+
+  return dl(config.split) + (secret_tag, utility_tag)

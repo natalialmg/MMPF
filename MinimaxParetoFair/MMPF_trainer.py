@@ -1,14 +1,14 @@
 import torch
 import numpy as np
-from train_utils import *
-from logger import instantiate_logger
-from losses import *
-from misc import *
+from .train_utils import *
+from .logger import instantiate_logger
+from .losses import losses
+from .misc import *
 from torch import optim
 from ast import literal_eval as make_tuple
 import sys
-sys.path.append(".")
-sys.path.append("..")
+# sys.path.append(".")
+# sys.path.append("..")
 
 import pandas as pd
 
@@ -67,12 +67,12 @@ class MMPF_trainer():
 
         #tag for the mu_init spec
         mu_init_str = ''
-        if (self.config.prefix != 'naive') & (self.config.prefix != 'balanced') :
+        if (self.config.prefix != 'naive') & (self.config.prefix != 'balanced'):
             for i in self.config.mu_init:
                 mu_init_str = mu_init_str+str(i)
 
         #save file name
-        self.save_file = '{:s}_split{:s}_paretofair_{:s}lr{:s}dlr{:s}_hls{:s}bs{:s}_{:s}_muini{:s}_seed{:d}'.format(
+        self.save_file = '/{:s}_split{:s}_paretofair_{:s}lr{:s}dlr{:s}_hls{:s}bs{:s}_{:s}_muini{:s}_seed{:d}'.format(
             self.config.dataset, str(self.config.split), self.config.optimizer, str(self.config.LEARNING_RATE), str(self.config.lrdecay),
             str(str_network), str(self.config.BATCH_SIZE),loss_str, str(mu_init_str), self.config.seed)
 
@@ -91,11 +91,11 @@ class MMPF_trainer():
 
         # print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
         print('-------------- MMPF Trainer OBJECT CREATED ----------------------------')
-        print('save_file :: ', self.config.save_file)
+        print('save_file:', self.config.save_file)
         print('-------------------------------------------------------------------------')
         # print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
 
-    def APSTAR_torch(self, mua_ini, niter = 15, max_patience = 15, Kini=1, Kmin = 20, alpha = 0.5):
+    def APSTAR_torch(self, mua_ini, niter = 15, max_patience = 15, Kini=1, Kmin = 20, alpha = 0.5, risk_round_factor=3):
         i = 0
         i_patience = 0
 
@@ -122,7 +122,7 @@ class MMPF_trainer():
 
             self.config.mu_penalty = torch.from_numpy(mu_i / mu_i.sum()).float()
             self.config.mu_penalty = self.config.mu_penalty.to(self.config.DEVICE)
-            print('#### Iteration ', i, '; mu_penalty : ', to_np(self.config.mu_penalty))
+            print('#### Iteration:', i, '; current mu: ', to_np(self.config.mu_penalty))
 
             # get h optiman and max risks
             base_loss_dic, full_loss_dic, accuracy_s_dic, opt_params_dic, best_base_loss_val = adaptive_optimizer(
@@ -133,7 +133,7 @@ class MMPF_trainer():
                 self.criteria, self.config)
 
             # h,risk,_ = bs_optimal(mu_i)
-            risk = np.round(best_base_loss_val + 0,2)
+            risk = np.round(best_base_loss_val + 0,risk_round_factor)
             risk_max = np.max(risk)
 
             # argmax_risks
@@ -161,14 +161,14 @@ class MMPF_trainer():
 
                 model_save(self.config.best_network_path, self.classifier_network, self.criteria,
                            self.optimizer)  #save model to best network Messi GOAT
-                print('Iteration : ', i,' k :',K,' Improve risk : ', argrisk_max_best, risk_max_best)
+                print('Iteration:', i,' k:',K,'Improved minimax risk (arg/max): ', argrisk_max_best, risk_max_best)
 
             else:  # no risk improvement
 
                 K += 1
                 i_patience += 1
                 type_step = 1 #no improvement
-                print('Iteration : ', i,' k :',K, ' No improved risk : ', argrisk_max_best, risk_max_best)
+                print('Iteration: ', i,' k:',K, 'No minimax risk improvement, current best (arg/max): ', argrisk_max_best, risk_max_best)
 
             self.classifier_network, self.criteria, self.optimizer = model_load(self.config.best_network_path)  # check this.. loading best last
 
@@ -190,10 +190,10 @@ class MMPF_trainer():
             #opt_params_saves[i] = opt_params_dic
             #full_loss_saves[i] = full_loss_dic
 
-            print('Iteration : ', i, ' ; type : ', type_step, ' risk (arg/ max)', argrisk_max,
-                  risk[argrisk_max], '; (arg/ max best) : ', argrisk_max_best, risk_max_best)
-            print('mu_i : ', mu_i, '; new delta_mu : ', step_mu_i, ' alpha : ', alpha, '; K : ', K)
-            print('risks : ', risk, ' ; risk_best : ', risk_best)
+            print('Iteration:', i, '; step reduced minimax?:', type_step, ' risk (arg/ max)', argrisk_max,
+                  risk[argrisk_max], '; (arg/ max best): ', argrisk_max_best, risk_max_best)
+            print('mu_i: ', mu_i, '; new delta_mu: ', step_mu_i, ' alpha: ', alpha, '; K: ', K)
+            print('risks: ', risk, ' ; best risk: ', risk_best)
             print()
             ############################################
 
@@ -205,7 +205,7 @@ class MMPF_trainer():
             ### Empirical Pareto Check ###
             risk_list_np = np.array(risk_list)
             pareto_mask = pareto_check(risk_list_np.transpose())
-            print('pareto[iteration] (1: non dominated, 0: dominated) : ', pareto_mask)
+            print('pareto[iteration] (1: non dominated, 0: dominated): ', pareto_mask)
             print('risks: ',risk_list_np)
             pareto_flag = (pareto_mask[pareto_mask.shape[0] - 1] > 0)
             if not pareto_flag:
@@ -223,7 +223,7 @@ class MMPF_trainer():
         # pareto_saves['opt_params_saves'] = opt_params_saves
         # pareto_saves['full_loss_saves'] = full_loss_saves
 
-        print('patience , iterations', i_patience, i)
+        print('patience counter:', i_patience, 'total iterations:', i)
         return pareto_saves
 
     def fast_epoch_evaluation_bundle(self, set = 'test'):
@@ -324,12 +324,12 @@ def APSTAR(bs_optimal, mua_ini, niter = 100, max_patience = 20, Kini=1,
         step_mu_i = mask_aux / np.sum(mask_aux)
 
         if verbose:
-            print('Iteration : ', i, ' ; type : ', type_step,' risk (arg/ max)', argrisk_max,
-                  risk[argrisk_max], '; (arg/ max best) : ',argrisk_max_best, risk_max_best)
+            print('Iteration:', i, ' ; step reduced minimax?: ', type_step,' risk (arg/ max)', argrisk_max,
+                  risk[argrisk_max], ';best max risk (arg/ max): ',argrisk_max_best, risk_max_best)
 
             #improve others
-            print('mu_i : ', mu_i, np.sum(mu_i),'; new delta_mu : ', step_mu_i,' alpha : ', alpha, '; K : ', K)
-            print('risks : ',risk, ' ; risk_best : ',risk_best)
+            print('mu_i:', mu_i, np.sum(mu_i),'; new delta_mu:', step_mu_i,' alpha:', alpha, '; K: ', K)
+            print('risks:',risk, ' ; best risk:',risk_best)
             print()
 
         #save lists
@@ -349,7 +349,7 @@ def APSTAR(bs_optimal, mua_ini, niter = 100, max_patience = 20, Kini=1,
     pareto_saves['mu_list'] = mu_list
     pareto_saves['mu_best_list'] = mu_best_list
 
-    print('patience , iterations', i_patience, i)
+    print('patience counter:', i_patience, 'total iterations:', i)
     print('-----------------------------------------')
     return pareto_saves
 

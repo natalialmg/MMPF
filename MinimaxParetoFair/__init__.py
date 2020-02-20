@@ -1,4 +1,3 @@
-#from ParetoFairness.utils.deprecated.ema import *
 import sys
 sys.path.append(".")
 sys.path.append("..")

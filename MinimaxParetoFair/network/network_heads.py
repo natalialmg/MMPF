@@ -1,4 +1,4 @@
-
+import torch.nn as nn
 from .network_utils import *
 from .network_bodies import *
 import sys

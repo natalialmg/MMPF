@@ -3,12 +3,14 @@ import numpy as np
 import torch, sys, pickle, os
 from distutils.util import strtobool
 
-# from utils.config import Config
-
-# from MinimaxParetoFair import *
-from dataset_loaders import *
-from MMPF_trainer import *
-from postprocessing import *
+import sys
+sys.path.append(".")
+sys.path.append("..")
+from MinimaxParetoFair import *
+# from dataset_loaders import *
+# from MMPF_trainer import *
+# from postprocessing import *
+import postprocessing
 from ast import literal_eval as make_tuple
 
 def main():
@@ -18,7 +20,6 @@ def main():
   config.add_argument('--bs', action='store', default=0, type=int, dest='BATCH_SIZE', help='batch size')
   config.add_argument('--epochs', action='store', default=1000, type=int, dest='EPOCHS', help='maximum number of epochs')
   config.add_argument('--lr', action='store', default=0, type=float, dest='LEARNING_RATE', help='learning rate')
-  config.add_argument('--momentum', action='store', default=0.9, type=float, dest='MOMENTUM', help='nesterov momentum')
   config.add_argument('--gpu_id', action='store', default=0, type=int, dest='GPU_ID', help='gpu id, use -1 to run on cpu')
   config.add_argument('--n_workers', action='store', default=32, type=int, dest='n_dataloader',
                       help='number of dataloader parallel workers')
@@ -27,7 +28,7 @@ def main():
   config.add_argument('--split', action='store', default=0, type=int, dest='split', help='dataset split number')
   config.add_argument('--lrdecay', action='store', default=0.25, type=float, dest='lrdecay', help='learning rate decay')
   config.add_argument('--optimizer', type=str, default='adam', help='optimizer to use (sgd, adam)')
-  config.add_argument('--prefix', action='store', default='', type=str, dest='prefix', help='save file prefix')
+  # config.add_argument('--prefix', action='store', default='', type=str, dest='prefix', help='save file prefix')
 
   config.add_argument('--shl', action='store', default='', type=str, dest='shidden', help='size of hidden layers')
 
@@ -35,13 +36,13 @@ def main():
   config.add_argument('--verbose', action='store', default=True, type=lambda x: bool(strtobool(x)),
                       help='boolean: print updates?')
   config.add_argument('--n_print', action='store', default=5, type=int, dest='n_print', help='print frequency')
-  config.add_argument('--tb_log', action='store', default='tb_log/', type='str', dest='loggdir',
+  config.add_argument('--tb_log', action='store', default='tb_log/', type=str, dest='loggdir',
                       help='tensorboard log path')
   config.add_argument('--log', action='store', default=False, type=lambda x: bool(strtobool(x)), dest='logger_active',
                       help='boolean: create tensorboard log?')
-  config.add_argument('--base_save_dir', action='store', default='save_fairness/', type='str', dest='save_dir',
+  config.add_argument('--base_save_dir', action='store', default='save_fairness/', type=str, dest='save_dir',
                       help='base directory to save final results')
-  config.add_argument('--base_model_save_dir', action='store', default='models/', type='str', dest='base_model_path',
+  config.add_argument('--base_model_save_dir', action='store', default='models/', type=str, dest='base_model_path',
                       help='base directory to store classifier')
 
 
@@ -50,7 +51,7 @@ def main():
                       help='epoch patience parameter inside adaptive optimization')
   config.add_argument('--mu_init', action='store', default='', type=str, dest='mu_init', help='initial mu penalty')
   config.add_argument('--loss_type', action='store', default=0, type=int, dest='type_loss',
-                      help='0: CrossEntropy, 1: Total Variation 2:Brier score (Categorical MSE)')
+                      help='0: CrossEntropy, 1: L1 2:Brier score (Categorical MSE)')
   config.add_argument('--sampler', action='store', default=True, type=lambda x: bool(strtobool(x)), dest='sampler',
                       help='boolean: activate discrimination penalty')
   config.add_argument('--type', type=str, default='minimax', help='type of fit (minimax, balanced , naive)')
@@ -70,12 +71,14 @@ def main():
   np.random.seed(config.seed)
 
   #------------ save dirs ------------#
-  config.save_dir = os.path.join(config.save_dir,config.dataset,config.dataset )
+  config.save_dir = os.path.join(config.save_dir,config.dataset)
   mkdir(config.save_dir)
+  os.makedirs(config.save_dir, exist_ok=True)
   base_dir_nw= os.path.join(config.base_model_path, config.dataset)
   mkdir(base_dir_nw)
-  config.best_network_path = base_dir_nw+'/goat_adult.pth' # Save path for best performing network in run
-  config.best_adaptive_network_path = base_dir_nw+'/best_iter_adult.pth' # Save path for best performing network for fixed mu values
+  os.makedirs(base_dir_nw, exist_ok=True)
+  config.best_network_path = base_dir_nw+'/goat_adult_{:d}.pth'.format(config.split) # Save path for best performing network in run
+  config.best_adaptive_network_path = base_dir_nw+'/best_iter_adult_{:d}.pth'.format(config.split)  # Save path for best performing network for fixed mu values
   #-----------------------------------#
 
   type_opt = config.type
@@ -103,10 +106,11 @@ def main():
       for i in aux:
           str_network = str_network + str(i) + '_'
   else:
-      str_network = ''
+      str_network = '_'
 
-  savepath = config.save_dir + 'MMPFNN_arq' + str_network
-  savepath = savepath + '_loss' + loss_str + '_seed' + str(config.seed) + '_split' + str(
+  savepath = config.save_dir + '/MMPFNN_arq' + str_network
+  savepath = savepath + 'loss' + loss_str + '_seed' + str(config.seed) + '_split' + str(
+
       config.split) + '_' + str_path + '.pkl'
 
   print('------------- Model file -------------')
@@ -114,16 +118,13 @@ def main():
 
   print('------------- INITIALIZING NETWORK &  DATALOADERS -------------')
   train_dataloader, val_dataloader, test_dataloader, classifier_network, config = get_dataloaders(config,
-                                                                                                  sampler=config.sampler,
-                                                                                                  resnet=True)
+                                                                                                  sampler=config.sampler)
   print('------------- INITIALIZING MMPF trainer -------------')
 
   # Initial weighting
-
   if (type_opt == 'naive'):
       mu_init = config.p_sensitive * 1000 + 0
       config.mu_init = str(tuple(mu_init.astype('int')))
-
 
   MMPF = MMPF_trainer(config, train_dataloader, val_dataloader, test_dataloader, classifier_network)
 
@@ -133,7 +134,7 @@ def main():
 
   print('------------- Evaluating -------------')
   df_test_result = MMPF.fast_epoch_evaluation_bundle()
-  pd_data_stats = results_dataframe(df_test_result,MMPF.config.dataset,
+  pd_data_stats = postprocessing.results_dataframe(df_test_result,MMPF.config.dataset,
                               model_tag=MMPF.config.type,split=MMPF.config.split,settype = 'test')
   print(pd_data_stats)
 
@@ -152,5 +153,6 @@ def main():
   with open(savepath, 'wb') as f:
       pickle.dump(save_data, f)
 
+  print('saved')
 if __name__ == '__main__':
     main()
