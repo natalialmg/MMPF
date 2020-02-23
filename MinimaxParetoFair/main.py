@@ -29,8 +29,15 @@ def main():
   config.add_argument('--lrdecay', action='store', default=0.25, type=float, dest='lrdecay', help='learning rate decay')
   config.add_argument('--optimizer', type=str, default='adam', help='optimizer to use (sgd, adam)')
   # config.add_argument('--prefix', action='store', default='', type=str, dest='prefix', help='save file prefix')
-
   config.add_argument('--shl', action='store', default='', type=str, dest='shidden', help='size of hidden layers')
+  config.add_argument('--batchnorm', action='store', default=False, type=lambda x: bool(strtobool(x)),
+                      dest='batchnorm',
+                      help='boolean: batchnorm')
+  config.add_argument('--resnet', action='store', default=-1, type=int, dest='resnet',
+                      help='resnet -1 is dataset default, 0 is noresnet, 1 is resnet')
+  config.add_argument('--regression', action='store', default=False, type=lambda x: bool(strtobool(x)),
+                      dest='regression',
+                      help='boolean: create tensorboard log?')
 
   # Print, log and store options
   config.add_argument('--verbose', action='store', default=True, type=lambda x: bool(strtobool(x)),
@@ -83,7 +90,7 @@ def main():
 
   type_opt = config.type
   str_path = type_opt+''
-  config.prefix = str_path
+  # config.prefix = str_path
 
   if (type_opt == 'balanced')|(type_opt == 'naive'):
       niter_apstar = 0

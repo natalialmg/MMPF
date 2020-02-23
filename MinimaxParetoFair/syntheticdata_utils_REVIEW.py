@@ -4,246 +4,12 @@ from . import *
 import sys
 from scipy.stats import bernoulli,norm
 import torch
-from ParetoFairness.network import *
+from MinimaxParetoFair.network import *
 from torch.utils.data import Dataset, DataLoader
 sys.path.append(".")
 sys.path.append("..")
 import matplotlib.pyplot as plt
 from ast import literal_eval as make_tuple
-
-def pareto_minmax(bs_optimal ,mua_ini ,niter = 100 ,max_patience = 20 ,eps_step = 1,
-                  eps_max = 5e-4 ,ceps_up = 1.5 ,ceps_down = 2 ,up_eps_update = 2,
-                  down_eps_update = 3 ,dir_update = False):
-    i = 0
-    i_patience = 0
-    down_update = 0
-    up_update = 0
-
-    mu_i = mua_ini
-    step_mu_i = np.ones(mu_i.shape ) /mu_i.shape[0]
-
-    ##outputs
-    risk_list = []
-    mu_list = []
-    risk_best_list = []
-    mu_best_list = []
-    params_list = []
-
-    K = 1
-    while (( i <=niter) & ( i_patience <=max_patience)):
-
-        # get h optiman and max risks
-        h ,risk,_ = bs_optimal(mu_i)
-        risk_max = np.max(risk)
-
-        # argmax_risks
-        argrisk_max = np.arange(risk.shape[0])
-        argrisk_max = argrisk_max[((risk_max - risk ) /risk_max) < eps_max]
-        mask_max = np.zeros(risk.shape[0])
-        mask_max[argrisk_max] = 1
-
-        if i == 0:
-
-            # Initialization#
-            risk_max_best = risk_max + 1
-            argrisk_max_best = argrisk_max
-            mask_max_best = mask_max + 0
-            mu_best = mu_i + 0
-
-            # Update delta_mu initial here if dir update for success is disabled#
-            if not dir_update:
-                aux = np.sum( step_mu_i *mask_max_best ) /np.sum(mask_max_best)
-                step_mu_aux = aux* mask_max_best
-                step_mu_i = step_mu_aux / np.sum(step_mu_aux)
-
-        # improved risk
-        if risk_max_best > risk_max:
-
-            ## Increase step size (epsilon)
-            up_update += 1
-            if (up_update >= up_eps_update) & (i > 0):
-                eps_step = eps_step * ceps_up
-
-            # update best risk
-            risk_max_best = risk_max + 0
-            argrisk_max_best = argrisk_max
-            risk_best = risk + 0
-            mask_max_best = mask_max + 0
-            mu_best = mu_i + 0
-
-            # Optional delta_mu update
-            if dir_update:
-                mask_aux = np.zeros(mask_max_best.shape)
-                mask_aux[risk >= risk_max_best] = 1
-                step_mu_aux = step_mu_i + (1 / (K * np.sum(mask_aux))) * mask_aux
-                step_mu_i = step_mu_aux / (1 + (1 / K))
-                # K += 1
-
-            ## resets
-            K = np.minimum(K, 20)
-            i_patience = 0
-            down_update = 0
-            type_step = 0
-
-            print('Iteration : ', i, ' Improve risk : ', argrisk_max_best, risk_max_best)
-
-        else:  # no risk improvement
-            up_update = 0
-
-            # improve others
-            print('Iteration : ', i, ' non improve risk (arg/ max, arg/ max best)', argrisk_max,
-                  risk[argrisk_max], argrisk_max_best, risk_max_best)
-
-            # update direction
-            mask_aux = np.zeros(mask_max_best.shape)
-            mask_aux[risk >= risk_max_best] = 1
-            step_mu_aux = step_mu_i + (1 / (K * np.sum(mask_aux))) * mask_aux
-            step_mu_i = step_mu_aux / (1 + (1 / K))
-            K += 1
-
-            # decrease step size
-            if down_update >= down_eps_update:
-                eps_step = np.maximum(eps_step / ceps_down, 1e-3)
-                print('decrease eps_step :', eps_step)
-                down_update = 0
-
-            down_update += 1
-            i_patience += 1
-            type_step = 1
-
-        print('delta_mu : ', step_mu_i * eps_step)
-        print('eps_step : ', eps_step, '; K : ', K)
-
-        ##save lists
-        params_list.append([type_step, K, eps_step])
-        risk_list.append(risk)
-        mu_list.append(mu_i)
-        risk_best_list.append(risk_best)
-        mu_best_list.append(mu_best)
-
-        ## Update mu
-        mu_i = mu_best + step_mu_i * eps_step
-        mu_i = mu_i / np.sum(mu_i)
-        i += 1
-
-    print('patience , iterations', i_patience, i)
-    return risk_list, mu_list, risk_best_list, mu_best_list, params_list
-def pareto_minmax_star(bs_optimal ,mua_ini ,niter = 100 ,max_patience = 20 ,Kini=1,Kmin = 1,eps_step = 0.5,
-                       ceps_up = 1.5 ,ceps_down = 2 ,up_eps_update = 2,
-                  down_eps_update = 3 ,eps_update = False, momentum = False,verbose = False):
-    i = 0
-    i_patience = 0
-    down_update = 0
-    up_update = 0
-
-    mu_i = mua_ini+0
-    d_mu_i = np.zeros(mua_ini.shape)
-
-
-    ##outputs
-    risk_list = []
-    mu_list = []
-    risk_best_list = []
-    mu_best_list = []
-    params_list = []
-
-    K = Kini
-    while (( i <=niter) & ( i_patience <=max_patience)):
-
-        # get h optiman and max risks
-        h ,risk,_ = bs_optimal(mu_i)
-        risk_max = np.max(risk)
-
-        # argmax_risks
-        argrisk_max = np.arange(risk.shape[0])
-        # argrisk_max = argrisk_max[((risk_max - risk ) /risk_max) < 1e-8]
-        argrisk_max = argrisk_max[risk == risk_max]
-
-        if i == 0:
-
-            # Initialization#
-            risk_max_best = risk_max + 1
-            argrisk_max_best = argrisk_max
-            mu_best = mu_i + 0
-
-        # improved risk
-        if risk_max_best > risk_max:
-
-            ## Increase step size (epsilon)
-            up_update += 1
-            if (eps_update)&(up_update >= up_eps_update) & (i > 0):
-                eps_step = np.minimum(eps_step * ceps_up,1)
-                if verbose:
-                    print('increase eps_step :', eps_step)
-
-            # update best risk
-            risk_max_best = risk_max + 0
-            argrisk_max_best = argrisk_max
-            risk_best = risk + 0
-            mu_best = mu_i + 0
-
-            ## resets
-            K = np.minimum(K, Kmin)
-            i_patience = 0
-            down_update = 0
-            type_step = 0
-
-
-
-        else:  # no risk improvement
-
-            # update decay series
-            K += 1
-
-            # decrease step size
-            if (eps_update)&(down_update >= down_eps_update):
-                eps_step = np.maximum(eps_step / ceps_down, 1e-3)
-                if verbose:
-                    print('decrease eps_step :', eps_step)
-                down_update = 0
-
-            down_update += 1
-            i_patience += 1
-            type_step = 1
-            up_update = 0
-
-
-        # step update
-        mask_aux = np.zeros(mu_i.shape)
-        mask_aux[risk >= risk_max_best] = 1
-        step_mu_i = mask_aux / np.sum(mask_aux)
-        d_mu_i = d_mu_i*(1-eps_step) + step_mu_i*eps_step
-
-        if verbose:
-            print('Iteration : ', i, ' ; type : ', type_step,' risk (arg/ max)', argrisk_max,
-                  risk[argrisk_max], '; (arg/ max best) : ',argrisk_max_best, risk_max_best)
-            # improve others
-            print('mu_i : ', mu_i, np.sum(mu_i),'; new delta_mu : ', step_mu_i,' eps_step : ', eps_step, '; K : ', K)
-            print('risks : ',risk, ' ; risk_best : ',risk_best)
-            print()
-
-
-
-        ##save lists
-        params_list.append([type_step, K, eps_step])
-        risk_list.append(risk)
-        mu_list.append(mu_i)
-        risk_best_list.append(risk_best)
-        mu_best_list.append(mu_best)
-
-
-
-        ## Update mu
-        if momentum:
-            mu_i =  mu_i + d_mu_i/K
-        else:
-            mu_i = (1 - eps_step) * mu_i + step_mu_i * eps_step / K
-        mu_i = mu_i / np.sum(mu_i)
-        i += 1
-
-    print('patience , iterations', i_patience, i)
-    print('-----------------------------------------')
-    return risk_list, mu_list, risk_best_list, mu_best_list, params_list
 
 def get_bs_optimal(x_array, p_xa, p_yxa, mua, type = 'MSE'):
     ##########################
@@ -530,21 +296,31 @@ def get_pandas_data(x_gen,a_gen,y_gen,ratios=[0.6,0.2,0.2]):
 
     return train_pd,val_pd,test_pd
 
-
 def get_dataloaders_pdtable(train_pd,val_pd,test_pd, sampler=True,cov_tags = ['x'], sensitive_tag='s',
-                            utility_tag='y', balanced_tag='s',batch_size = 32, n_dataloader = 32,shuffle_train=True,shuffle_val=False):
+                            utility_tag='y', balanced_tag='s',batch_size = 32,
+                            n_dataloader = 32,shuffle_train=True,shuffle_val=False, regression = False):
     from .misc import get_weight_dict
 
     n_utility = train_pd[utility_tag].nunique()
     n_sensitive = train_pd[sensitive_tag].nunique()
+    print('HERE',train_pd[sensitive_tag].nunique() )
+    if train_pd[sensitive_tag].nunique()>1:
+        train_pd['sensitive_cat'] = train_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+        test_pd['sensitive_cat'] = test_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+        val_pd['sensitive_cat'] = val_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+    else:
+        train_pd.loc[:,'sensitive_cat'] = 1
+        test_pd.loc[:,'sensitive_cat'] = 1
+        val_pd.loc[:,'sensitive_cat'] = 1
 
-    train_pd['sensitive_cat'] = train_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
-    test_pd['sensitive_cat'] = test_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
-    val_pd['sensitive_cat'] = val_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
-
-    train_pd['utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-    test_pd['utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-    val_pd['utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    if not regression:
+        train_pd['utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+        test_pd['utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+        val_pd['utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    else:
+        train_pd.loc[:,'utility_cat'] = train_pd[utility_tag]
+        test_pd.loc[:,'utility_cat'] = test_pd[utility_tag]
+        val_pd.loc[:,'utility_cat'] = val_pd[utility_tag]
 
     # get prior of subgroups
     config.p_sensitive = train_pd['sensitive_cat'].mean()
@@ -583,6 +359,58 @@ def get_dataloaders_pdtable(train_pd,val_pd,test_pd, sampler=True,cov_tags = ['x
 
     return train_dataloader, val_dataloader, test_dataloader
 
+# def get_dataloaders_pdtable(train_pd,val_pd,test_pd, sampler=True,cov_tags = ['x'], sensitive_tag='s',
+#                             utility_tag='y', balanced_tag='s',batch_size = 32, n_dataloader = 32,shuffle_train=True,shuffle_val=False):
+#     from .misc import get_weight_dict
+#
+#     n_utility = train_pd[utility_tag].nunique()
+#     n_sensitive = train_pd[sensitive_tag].nunique()
+#
+#     train_pd['sensitive_cat'] = train_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+#     test_pd['sensitive_cat'] = test_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+#     val_pd['sensitive_cat'] = val_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+#
+#     train_pd['utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+#     test_pd['utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+#     val_pd['utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+#
+#     # get prior of subgroups
+#     config.p_sensitive = train_pd['sensitive_cat'].mean()
+#     config.p_utility = train_pd['utility_cat'].mean()
+#
+#     weight_dic = get_weight_dict(train_pd, balanced_tag)
+#     train_weights = torch.DoubleTensor(train_pd[balanced_tag].apply(lambda x: weight_dic[x]).values)
+#     train_sampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, len(train_weights))
+#
+#     composed = None  # Tabular data
+#
+#     if sampler:
+#         train_dataloader = DataLoader(TablePandasDataset(pd=train_pd, cov_list=cov_tags,
+#                                                          utility_tag='utility_cat', sensitive_tag='sensitive_cat',
+#                                                          transform=composed),
+#                                       batch_size=batch_size,
+#                                       sampler=train_sampler, num_workers=n_dataloader, pin_memory=True)
+#     else:
+#         train_dataloader = DataLoader(TablePandasDataset(pd=train_pd,cov_list = cov_tags,
+#                                                          utility_tag = 'utility_cat', sensitive_tag = 'sensitive_cat',
+#                                                          transform=composed),
+#                                     batch_size=batch_size,
+#                                     shuffle=shuffle_train, num_workers=n_dataloader, pin_memory = True)
+#
+#     val_dataloader = DataLoader(TablePandasDataset(pd=val_pd, cov_list=cov_tags,
+#                                                    utility_tag='utility_cat', sensitive_tag='sensitive_cat',
+#                                                    transform=composed),
+#                                 batch_size=batch_size,
+#                                 shuffle=shuffle_val, num_workers=n_dataloader, pin_memory=True)
+#
+#     test_dataloader = DataLoader(TablePandasDataset(pd=test_pd, cov_list=cov_tags,
+#                                                     utility_tag='utility_cat', sensitive_tag='sensitive_cat',
+#                                                     transform=composed),
+#                                  batch_size=batch_size,
+#                                  shuffle=False, num_workers=n_dataloader, pin_memory=True)
+#
+#     return train_dataloader, val_dataloader, test_dataloader
+#
 
 def synthetic_samples_ybin_xgmm(param_pa, param_pxa, param_pyxa, seed=42, n_samples=10000, verbose = False, ratios = [0.6, 0.2, 0.2]):
     print(param_pa, param_pyxa, param_pxa)
@@ -632,11 +460,11 @@ def make_classifier(config,resnet = True):
         classifier_network = VanillaNet(config.n_utility,
                                         FCResnetBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
                                                      residual_depth=2,
-                                               gate=F.relu))
+                                               gate=F.relu,use_batchnorm=config.batchnorm))
     else:
         classifier_network = VanillaNet(config.n_utility,
                                         FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
-                                                   gate=F.relu))
+                                                   gate=F.relu,use_batchnorm=config.batchnorm))
 
     print(classifier_network)
 

@@ -95,7 +95,7 @@ def load_mimic(split = None):
     return train_pd, val_pd, test_pd
 
 def get_dataloaders_mimic(config, sampler=True, secret_tag='combined', utility_tag='utility', balanced_tag='combined',
-                          shuffle_train=True,shuffle_val = True,resnet = False):
+                          shuffle_train=True,shuffle_val = True):
     from .misc import get_weight_dict
 
     train_pd, val_pd, test_pd = load_mimic(split = config.split)
@@ -116,6 +116,11 @@ def get_dataloaders_mimic(config, sampler=True, secret_tag='combined', utility_t
 
     if config.patience == 0:
         config.patience = 10
+
+    if (config.resnet != 0) & (config.resnet != 1):
+        resnet = False
+    else:
+        resnet = bool(config.resnet)
 
     train_pd['secret_cat'] = train_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=n_secret))
     test_pd['secret_cat'] = test_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=n_secret))
@@ -171,7 +176,7 @@ def get_dataloaders_mimic(config, sampler=True, secret_tag='combined', utility_t
     else:
         classifier_network = VanillaNet(config.n_utility,
                                         FCBody(state_dim=config.size, hidden_units=hidden_units,
-                                               gate=F.elu))
+                                               gate=F.elu,use_batchnorm = config.batchnorm))
     print(classifier_network)
 
     return train_dataloader, val_dataloader, test_dataloader, classifier_network,config
@@ -288,7 +293,7 @@ def load_german(split=None):
     return train_pd, val_pd, test_pd, col_tags
 
 def get_dataloaders_german(config, sampler=True, secret_tag='sex_cat', utility_tag='credit_cat',
-                           balanced_tag='sex_cat',shuffle_train=True,shuffle_val = True,resnet = False):
+                           balanced_tag='sex_cat',shuffle_train=True,shuffle_val = True):
     from .misc import get_weight_dict
     train_pd, val_pd, test_pd, col_tags = load_german(split=config.split)
 
@@ -307,6 +312,10 @@ def get_dataloaders_german(config, sampler=True, secret_tag='sex_cat', utility_t
         else:
             config.LEARNING_RATE = 1e-3
     config.size = len(config.cov_tags)
+    if (config.resnet != 0) & (config.resnet != 1):
+        resnet = True
+    else:
+        resnet = bool(config.resnet)
 
     ## Dataframe rename
     train_pd['secret_cat'] = train_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=config.n_sensitive))
@@ -368,7 +377,7 @@ def get_dataloaders_german(config, sampler=True, secret_tag='sex_cat', utility_t
     else:
         classifier_network = VanillaNet(config.n_utility,
                                         FCBody(state_dim=config.size, hidden_units=hidden_units,
-                                               gate=F.elu))
+                                               gate=F.elu,use_batchnorm = config.batchnorm))
 
     print(classifier_network)
 
@@ -460,7 +469,7 @@ def load_adult(split=None):
     return train_pd, val_pd, test_pd, col_tags
 
 def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_tag='income-per-year_cat',
-                          balanced_tag='sex_cat',shuffle_train=True,shuffle_val = True,resnet = True):
+                          balanced_tag='sex_cat',shuffle_train=True,shuffle_val = True):
     from .misc import get_weight_dict
     train_pd, val_pd, test_pd, col_tags = load_adult(split=config.split)
 
@@ -481,7 +490,10 @@ def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_ta
             config.LEARNING_RATE = 5e-4
     if config.patience == 0:
         config.patience = 15
-
+    if (config.resnet != 0) & (config.resnet != 1):
+        resnet = True
+    else:
+        resnet = bool(config.resnet)
     ## Dataframe rename
     train_pd['secret_cat'] = train_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=config.n_sensitive))
     test_pd['secret_cat'] = test_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=config.n_sensitive))
@@ -544,7 +556,7 @@ def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_ta
     else:
         classifier_network = VanillaNet(config.n_utility,
                                         FCBody(state_dim=config.size, hidden_units=hidden_units,
-                                               gate=F.elu))
+                                               gate=F.elu,use_batchnorm = config.batchnorm))
 
     print(classifier_network)
     return train_dataloader, val_dataloader, test_dataloader, classifier_network,config

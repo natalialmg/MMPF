@@ -41,6 +41,8 @@ class MMPF_trainer():
         else:
             loss_str = 'CE'
             reduction = 'sum'
+            if self.config.regression:
+                print('CAREFUL CE LOSS WITH REGRESSION OBJECTIVE!')
 
         self.criteria = losses(type_loss=config.type_loss,reduction=reduction)
 
@@ -67,9 +69,9 @@ class MMPF_trainer():
 
         #tag for the mu_init spec
         mu_init_str = ''
-        if (self.config.prefix != 'naive') & (self.config.prefix != 'balanced'):
+        if (self.config.type != 'naive') & (self.config.type != 'balanced'):
             for i in self.config.mu_init:
-                mu_init_str = mu_init_str+str(i)
+                mu_init_str = mu_init_str+str(int(i))
 
         #save file name
         self.save_file = '/{:s}_split{:s}_paretofair_{:s}lr{:s}dlr{:s}_hls{:s}bs{:s}_{:s}_muini{:s}_seed{:d}'.format(
@@ -79,8 +81,8 @@ class MMPF_trainer():
         #add prefixes
         if not config.sampler:
             self.save_file = self.save_file+'_samplerfalse'
-        if self.config.prefix != '':
-            self.save_file = self.save_file +'_'+self.config.prefix
+        if self.config.type != '':
+            self.save_file = self.save_file +'_'+self.config.type
 
         self.config.save_file = self.config.save_dir + self.save_file
         self.config.save_file_logger = self.save_file

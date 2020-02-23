@@ -40,30 +40,30 @@ class ConvStackBody(nn.Module):
         return x
 
 
+# class FCBody(nn.Module):
+#     def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu):
+#         super(FCBody, self).__init__()
+#         dims = (state_dim,) + hidden_units
+#         self.layers = nn.ModuleList(
+#             [layer_init(nn.Linear(dim_in, dim_out)) for dim_in, dim_out in zip(dims[:-1], dims[1:])])
+#         self.gate = gate
+#         self.feature_dim = dims[-1]
+#
+#     def forward(self, x):
+#         for layer in self.layers:
+#             x = self.gate(layer(x))
+#         return x
+
 class FCBody(nn.Module):
-    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu):
+    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu, use_batchnorm=False):
         super(FCBody, self).__init__()
-        dims = (state_dim,) + hidden_units
-        self.layers = nn.ModuleList(
-            [layer_init(nn.Linear(dim_in, dim_out)) for dim_in, dim_out in zip(dims[:-1], dims[1:])])
-        self.gate = gate
-        self.feature_dim = dims[-1]
-
-    def forward(self, x):
-        for layer in self.layers:
-            x = self.gate(layer(x))
-        return x
-
-class FCBody_v2(nn.Module):
-    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu, use_batchnorm=True):
-        super(FCBody_v2, self).__init__()
         dims = (state_dim,) + hidden_units
         self.layers = nn.ModuleList()
         self.regs = nn.ModuleList()
         for _ in range(len(dims) - 1):
             self.layers.append(layer_init(nn.Linear(dims[_], dims[_ + 1])))
             if use_batchnorm:
-                self.regs.append(nn.BatchNorm1d(dims[_ + 1]))
+                self.regs.append(nn.BatchNorm1d(dims[_ + 1],momentum=0.5))
             else:
                 self.regs.append(nn.Identity())
         self.gate = gate
@@ -76,41 +76,72 @@ class FCBody_v2(nn.Module):
 
         return x
 
+# class FCResnetLayer(nn.Module):
+#     def __init__(self, state_dim, hidden_unit=64, gate=F.relu, residual_depth=None):
+#         super(FCResnetLayer, self).__init__()
+#         if residual_depth is None:
+#             residual_depth = 1
+#         self.gate = gate
+#         self.layers = nn.ModuleList(
+#             [layer_init(nn.Linear(state_dim, hidden_unit))])
+#         for _ in range(residual_depth - 1):
+#             self.layers.extend([layer_init(nn.Linear(hidden_unit,hidden_unit))])
+#
+#     def forward(self, x):
+#         y = x = self.layers[0](x)
+#         for layer in self.layers[1:]:
+#             y = layer(self.gate(y))
+#         return x + y
+
 class FCResnetLayer(nn.Module):
-    def __init__(self, state_dim, hidden_unit=64, gate=F.relu, residual_depth=None):
+    def __init__(self, state_dim, hidden_unit=64, gate=F.relu, residual_depth=None, use_batchnorm=False):
         super(FCResnetLayer, self).__init__()
         if residual_depth is None:
             residual_depth = 1
         self.gate = gate
-        self.layers = nn.ModuleList(
-            [layer_init(nn.Linear(state_dim, hidden_unit))])
+        self.layers = nn.ModuleList()
+        self.regs = nn.ModuleList()
+
+        #first layer
+        self.layers.append(layer_init(nn.Linear(state_dim, hidden_unit)))
+
+        #residual block
         for _ in range(residual_depth - 1):
-            self.layers.extend([layer_init(nn.Linear(hidden_unit,hidden_unit))])
+            self.layers.append(layer_init(nn.Linear(hidden_unit,hidden_unit)))
+            if use_batchnorm:
+                self.regs.append(nn.BatchNorm1d(hidden_unit,momentum=0.5))
+            else:
+                self.regs.append(nn.Identity())
 
     def forward(self, x):
         y = x = self.layers[0](x)
-        for layer in self.layers[1:]:
-            y = layer(self.gate(y))
+        for i, layer in enumerate(self.layers[1:]):
+            reg = self.regs[i]
+            y = layer(self.gate(reg(y)))
         return x + y
 
+
 class FCResnetBody(nn.Module):
-    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu, residual_depth=1):
+    def __init__(self, state_dim, hidden_units=(64, 64), gate=F.relu, residual_depth=1, use_batchnorm=False):
         super(FCResnetBody, self).__init__()
         dims = (state_dim,) + hidden_units
-        self.layers = nn.ModuleList(
-            [FCResnetLayer(state_dim=dim_in, hidden_unit=dim_out, gate=gate, residual_depth=residual_depth)
-             for dim_in, dim_out in zip(dims[:-1], dims[1:])])
+        self.layers = nn.ModuleList()
+        self.regs = nn.ModuleList()
         self.gate = gate
         self.feature_dim = dims[-1]
+        for _ in range(len(dims) - 1):
+            self.layers.append(FCResnetLayer(state_dim=dims[_], hidden_unit=dims[_ + 1],
+                                             gate=gate, residual_depth=residual_depth,
+                                             use_batchnorm=use_batchnorm))
+            if use_batchnorm:
+                self.regs.append(nn.BatchNorm1d(dims[_ + 1] , momentum=0.5))
+            else:
+                self.regs.append(nn.Identity())
 
     def forward(self, x):
-        for layer in self.layers:
-            x = self.gate(layer(x))
+        for i, layer in enumerate(self.layers):
+            x = self.gate(self.regs[i](layer(x)))
         return x
-
-
-
-
 
 
 class DummyBody(nn.Module):
