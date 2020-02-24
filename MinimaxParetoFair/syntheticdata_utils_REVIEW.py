@@ -440,7 +440,7 @@ def synthetic_samples_ybin_xgmm(param_pa, param_pxa, param_pyxa, seed=42, n_samp
 
     return train_pd, val_pd, test_pd
 
-def make_classifier(config,resnet = True,residual_depth= 2):
+def make_classifier(config,resnet = True,residual_depth= 2, gate = F.elu):
 
     ## NETWORK ##
     # if seed is None:
@@ -460,11 +460,11 @@ def make_classifier(config,resnet = True,residual_depth= 2):
         classifier_network = VanillaNet(config.n_utility,
                                         FCResnetBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
                                                      residual_depth=residual_depth,
-                                               gate=F.relu,use_batchnorm=config.batchnorm))
+                                               gate=gate,use_batchnorm=config.batchnorm))
     else:
         classifier_network = VanillaNet(config.n_utility,
                                         FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
-                                                   gate=F.relu,use_batchnorm=config.batchnorm))
+                                                   gate=gate,use_batchnorm=config.batchnorm))
 
     print(classifier_network)
 
