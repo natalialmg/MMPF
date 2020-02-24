@@ -1,5 +1,6 @@
-import argparse, sys
+import argparse
 import torch
+import sys
 from distutils.util import strtobool
 
 
