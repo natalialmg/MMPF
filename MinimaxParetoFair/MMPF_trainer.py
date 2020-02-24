@@ -44,7 +44,7 @@ class MMPF_trainer():
             if self.config.regression:
                 print('CAREFUL CE LOSS WITH REGRESSION OBJECTIVE!')
 
-        self.criteria = losses(type_loss=config.type_loss,reduction=reduction)
+        self.criteria = losses(type_loss=config.type_loss,reduction=reduction,regression=config.regression)
 
         ## Optimizer ##
         if config.optimizer == 'adam':
