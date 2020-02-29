@@ -48,7 +48,7 @@ class losses(nn.Module):
 
         elif self.type_loss == 0:
             if not self.regression:
-                inputs = torch.nn.Softmax(dim=-1)(inputs)
+                inputs = torch.nn.LogSoftmax(dim=-1)(inputs)
             # else:
             #     inputs = torch.nn.Tanh()(inputs)
             ret = -1*(inputs*targets)
