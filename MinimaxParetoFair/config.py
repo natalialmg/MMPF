@@ -47,6 +47,9 @@ def make_defconfig():
     config.add_argument('--regression', action='store', default=False, type=lambda x: bool(strtobool(x)),
                                 dest='regression',
                                 help='boolean: create tensorboard log?')
+    config.add_argument('--resetopt', action='store', default=False, type=lambda x: bool(strtobool(x)),
+                        dest='resetopt',
+                        help='boolean: reset optimizer after each new apstar iteration?')
 
     # Print, log and store options
     config.add_argument('--verbose', action='store', default=True, type=lambda x: bool(strtobool(x)),

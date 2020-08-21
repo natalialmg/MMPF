@@ -4,8 +4,7 @@ from .network_bodies import *
 import sys
 sys.path.append(".")
 sys.path.append("..")
-from MinimaxParetoFair import *
-
+# from MinimaxParetoFair import *
 
 class VanillaNet(nn.Module, BaseNet):
     def __init__(self, output_dim, body,use_dropout=False, dropout_p=0.5, feature_dim=None):
@@ -22,12 +21,11 @@ class VanillaNet(nn.Module, BaseNet):
         # self.to(Config.DEVICE)
 
     def forward(self, x):
-        phi = self.body(tensor(x))
+        # phi = self.body(tensor(x))
+        phi = self.body(x)
         phi = self.reg(phi)
         y = self.fc_head(phi)
         return y
-
-
 
 class CategoricalNet(nn.Module, BaseNet):
     def __init__(self, output_dim, body):
@@ -43,4 +41,3 @@ class CategoricalNet(nn.Module, BaseNet):
         prob = F.softmax(pre_prob, dim=-1)
         log_prob = F.log_softmax(pre_prob, dim=-1)
         return prob, log_prob
-

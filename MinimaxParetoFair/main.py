@@ -38,6 +38,9 @@ def main():
   config.add_argument('--regression', action='store', default=False, type=lambda x: bool(strtobool(x)),
                       dest='regression',
                       help='boolean: create tensorboard log?')
+  config.add_argument('--resetopt', action='store', default=False, type=lambda x: bool(strtobool(x)),
+                      dest='resetopt',
+                      help='boolean: reset optimizer after each new apstar iteration?')
 
   # Print, log and store options
   config.add_argument('--verbose', action='store', default=True, type=lambda x: bool(strtobool(x)),
@@ -116,9 +119,7 @@ def main():
       str_network = '_'
 
   savepath = config.save_dir + '/MMPFNN_arq' + str_network
-  savepath = savepath + 'loss' + loss_str + '_seed' + str(config.seed) + '_split' + str(
-
-      config.split) + '_' + str_path + '.pkl'
+  savepath = savepath + 'loss' + loss_str + '_seed' + str(config.seed) + '_split' + str(config.split) + '_' + str_path + '.pkl'
 
   print('------------- Model file -------------')
   print(savepath)
@@ -127,7 +128,7 @@ def main():
   train_dataloader, val_dataloader, test_dataloader, classifier_network, config = get_dataloaders(config,
                                                                                                   sampler=config.sampler)
   print('------------- INITIALIZING MMPF trainer -------------')
-
+  print('reset opt ', config.resetopt)
   # Initial weighting
   if (type_opt == 'naive'):
       mu_init = config.p_sensitive * 1000 + 0
@@ -136,7 +137,8 @@ def main():
   MMPF = MMPF_trainer(config, train_dataloader, val_dataloader, test_dataloader, classifier_network)
 
   print('------------- Training -------------')
-  MMPF_saves = MMPF.APSTAR_torch(MMPF.config.mu_init, niter=niter_apstar, max_patience=MMPF.config.patience)
+  MMPF_saves = MMPF.APSTAR_torch(MMPF.config.mu_init, niter=niter_apstar, max_patience=MMPF.config.patience,
+                                 reset_optimizer = MMPF.config.resetopt)
   model_save(MMPF.config.save_file_model, MMPF.classifier_network,MMPF.criteria,MMPF.optimizer)
 
   print('------------- Evaluating -------------')

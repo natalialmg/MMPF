@@ -69,12 +69,14 @@ class MMPF_trainer():
 
         #tag for the mu_init spec
         mu_init_str = ''
-        if (self.config.type != 'naive') & (self.config.type != 'balanced'):
+        flag = self.config.mu_init/np.sum(self.config.mu_init) - np.ones(self.config.mu_init.shape)/self.config.mu_init.shape[0]
+        flag = np.sum(np.abs(flag))
+        if (self.config.type != 'naive') & (self.config.type != 'balanced') & (flag != 0):
             for i in self.config.mu_init:
                 mu_init_str = mu_init_str+str(int(i))
 
         #save file name
-        self.save_file = '/{:s}_split{:s}_paretofair_{:s}lr{:s}dlr{:s}_hls{:s}bs{:s}_{:s}_muini{:s}_seed{:d}'.format(
+        self.save_file = '{:s}_split{:s}_paretofair_{:s}lr{:s}dlr{:s}_hls{:s}bs{:s}_{:s}_muini{:s}_seed{:d}'.format(
             self.config.dataset, str(self.config.split), self.config.optimizer, str(self.config.LEARNING_RATE), str(self.config.lrdecay),
             str(str_network), str(self.config.BATCH_SIZE),loss_str, str(mu_init_str), self.config.seed)
 
@@ -97,7 +99,8 @@ class MMPF_trainer():
         print('-------------------------------------------------------------------------')
         # print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
 
-    def APSTAR_torch(self, mua_ini, niter = 15, max_patience = 15, Kini=1, Kmin = 20, alpha = 0.5, risk_round_factor=3):
+    def APSTAR_torch(self, mua_ini, niter = 15, max_patience = 15, Kini=1, Kmin = 20, alpha = 0.5,
+                     risk_round_factor=3,reset_optimizer = False):
         i = 0
         i_patience = 0
 
@@ -125,6 +128,13 @@ class MMPF_trainer():
             self.config.mu_penalty = torch.from_numpy(mu_i / mu_i.sum()).float()
             self.config.mu_penalty = self.config.mu_penalty.to(self.config.DEVICE)
             print('#### Iteration:', i, '; current mu: ', to_np(self.config.mu_penalty))
+
+            if reset_optimizer:
+                print('Optimizer reset ; lr : ',self.config.LEARNING_RATE )
+                if self.config.optimizer == 'adam':
+                    self.optimizer = optim.Adam(self.classifier_network.parameters(), lr=self.config.LEARNING_RATE)
+                else:
+                    self.optimizer = optim.SGD(self.classifier_network.parameters(), lr=self.config.LEARNING_RATE)
 
             # get h optiman and max risks
             base_loss_dic, full_loss_dic, accuracy_s_dic, opt_params_dic, best_base_loss_val = adaptive_optimizer(
@@ -288,6 +298,7 @@ def APSTAR(bs_optimal, mua_ini, niter = 100, max_patience = 20, Kini=1,
 
         # get h optiman and max risks
         risk = bs_optimal(mu_i)
+        # print(risk)
         risk_max = np.max(risk)
 
         # argmax_risks

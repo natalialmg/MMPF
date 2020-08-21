@@ -4,14 +4,19 @@ import numpy as np
 import sys, os
 sys.path.append(".")
 sys.path.append("..")
-from MinimaxParetoFair.network import *
+# from MinimaxParetoFair.network import *
 
+from MinimaxParetoFair import *
+from .dataloader_utils import *
 import torchvision
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-from torchvision.transforms import Resize, ToPILImage, ToTensor
+from torchvision.transforms import Resize, ToPILImage, ToTensor,RandomHorizontalFlip,RandomVerticalFlip, RandomRotation, RandomAffine
 from torchvision import models
+from .misc import *
+from .network import *
+
 # from .synthetic_data_loaders import *
 from ast import literal_eval as make_tuple
 
@@ -190,71 +195,100 @@ def load_HAM():
 
     return train_pd, val_pd, test_pd
 
-def get_dataloaders_HAM(config, sampler=True, secret_tag='cell_type_idx',
-                        utility_tag='utility', balanced_tag='cell_type_idx',shuffle_train=True,shuffle_val = True):
+def get_dataloaders_HAM(config,train_pd, val_pd, test_pd,sampler=True, sensitive_tag='cell_type_idx',utility_tag='cell_type_idx',
+                        balanced_tag='cell_type_idx',shuffle_train=True,shuffle_val = False,composed_val = True,resize = 224):
 
-    train_pd, val_pd, test_pd = load_HAM()
+    # train_pd, val_pd, test_pd = load_HAM()
 
     n_utility = train_pd[utility_tag].nunique()
-    n_secret = train_pd[secret_tag].nunique()
+    n_sensitive = train_pd[sensitive_tag].nunique()
 
     config.n_utility = n_utility  # depends on dataset
-    config.n_sensitive = n_secret  # depends on dataset
+    config.n_sensitive = n_sensitive  # depends on dataset
     config.size = 224  # depends on dataset
     if config.BATCH_SIZE == 0:
         config.BATCH_SIZE = 32
     if config.LEARNING_RATE == 0:
         if config.type_loss == 0:
-            config.LEARNING_RATE = 2e-6
+            config.LEARNING_RATE = 1e-6
         else:
-            config.LEARNING_RATE = 5e-6
+            config.LEARNING_RATE = 1e-6
 
     if config.patience == 0:
         config.patience = 10
 
-    train_pd['secret_cat'] = train_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=n_secret))
-    test_pd['secret_cat'] = test_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=n_secret))
-    val_pd['secret_cat'] = val_pd[secret_tag].apply(lambda x: to_categorical(x, num_classes=n_secret))
+    train_pd.loc[:,'sensitive_cat'] = train_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+    test_pd.loc[:,'sensitive_cat'] = test_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+    val_pd.loc[:,'sensitive_cat'] = val_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
 
-    train_pd['utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-    test_pd['utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-    val_pd['utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    train_pd.loc[:,'utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    test_pd.loc[:,'utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    val_pd.loc[:,'utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
 
     # get prior of subgroups
-    config.p_sensitive = train_pd['secret_cat'].mean()
+    config.p_sensitive = train_pd['sensitive_cat'].mean()
     config.p_utility = train_pd['utility_cat'].mean()
 
     weight_dic = get_weight_dict(train_pd, balanced_tag)
-    train_weights = torch.DoubleTensor(train_pd.secret.apply(lambda x: weight_dic[x]).values)
+    train_weights = torch.DoubleTensor(train_pd[balanced_tag].apply(lambda x: weight_dic[x]).values)
     train_sampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, len(train_weights))
 
     composed = torchvision.transforms.Compose([ColorizeToPIL(),
                                                Resize((config.size, config.size), interpolation=2), ToTensor(), ])
 
+    # composed = torchvision.transforms.Compose([ColorizeToPIL(),
+    #                                            Resize((resize, resize), interpolation=2),
+    #                                            RandomHorizontalFlip(),RandomVerticalFlip(),
+    #                                            RandomRotation(180),
+    #                                            ToTensor(), ])
+
+    # composed = torchvision.transforms.Compose([ColorizeToPIL(),
+    #                                            Resize((resize, resize), interpolation=2),
+    #                                            RandomAffine(degrees = 0,translate=(0.12, 0.12),scale=(0.8,1.2)),
+    #                                            RandomHorizontalFlip(),RandomVerticalFlip(),
+    #                                            ToTensor(), ])
+
+    composed = torchvision.transforms.Compose([ColorizeToPIL(),
+                                               Resize((resize, resize), interpolation=2),
+                                               RandomAffine(degrees = 0,translate=(0, 0),scale=(0.9,1.2)),
+                                               RandomHorizontalFlip(),RandomVerticalFlip(),
+                                               ToTensor(), ])
+
+    composed_test = torchvision.transforms.Compose([ColorizeToPIL(),
+                                               Resize((resize, resize), interpolation=2), ToTensor(), ])
+
+
     if sampler:
         train_dataloader = DataLoader(ImageDataset(pd=train_pd, utility_tag='utility_cat',
-                                                   secret_tag='secret_cat',
+                                                   secret_tag='sensitive_cat',
                                                    transform=composed),
                                       batch_size=config.BATCH_SIZE,
                                       sampler=train_sampler, num_workers=config.n_dataloader, pin_memory=True)
     else:
         train_dataloader = DataLoader(ImageDataset(pd=train_pd, utility_tag='utility_cat',
-                                                   secret_tag='secret_cat',
+                                                   secret_tag='sensitive_cat',
                                                    transform=composed),
                                       batch_size=config.BATCH_SIZE,
                                       shuffle=shuffle_train, num_workers=config.n_dataloader, pin_memory=True)
 
-    val_dataloader = DataLoader(ImageDataset(pd=val_pd, utility_tag='utility_cat',
-                                             secret_tag='secret_cat',
-                                             transform=composed),
-                                batch_size=config.BATCH_SIZE,
-                                shuffle=shuffle_val, num_workers=config.n_dataloader, pin_memory=True)
+    if composed_val:
+        val_dataloader = DataLoader(ImageDataset(pd=val_pd, utility_tag='utility_cat',
+                                                 secret_tag='sensitive_cat',
+                                                 transform=composed),
+                                    batch_size=config.BATCH_SIZE,
+                                    shuffle=shuffle_val, num_workers=config.n_dataloader, pin_memory=True)
+    else:
+        val_dataloader = DataLoader(ImageDataset(pd=val_pd, utility_tag='utility_cat',
+                                                 secret_tag='sensitive_cat',
+                                                 transform=composed_test),
+                                    batch_size=config.BATCH_SIZE,
+                                    shuffle=shuffle_val, num_workers=config.n_dataloader, pin_memory=True)
 
     test_dataloader = DataLoader(ImageDataset(pd=test_pd, utility_tag='utility_cat',
-                                              secret_tag='secret_cat',
-                                              transform=composed),
+                                              secret_tag='sensitive_cat',
+                                              transform=composed_test),
                                  batch_size=config.BATCH_SIZE,
-                                 shuffle=True, num_workers=config.n_dataloader, pin_memory=True)
+                                 shuffle=False, num_workers=config.n_dataloader, pin_memory=True)
 
     ### NETWORK BIG #### config.size = 224
     classifier_network = VanillaNet(config.n_utility, body=models.densenet121(pretrained=True),
@@ -562,15 +596,17 @@ def get_dataloaders_adult(config, sampler=True, secret_tag='sex_cat', utility_ta
     return train_dataloader, val_dataloader, test_dataloader, classifier_network,config
 
 
-def get_dataloaders_image(config,train_pd, val_pd, test_pd, sampler=True, secret_tag='sensitive',
-                        utility_tag='utility', balanced_tag='sensitive',shuffle_train=True,shuffle_val = True):
+def get_dataloaders_image(config,train_pd, val_pd, test_pd,
+                          sampler=True, secret_tag='sensitive',
+                        utility_tag='utility', balanced_tag='sensitive',
+                          shuffle_train=True,shuffle_val = True,resize = 224):
 
     n_utility = train_pd[utility_tag].nunique()
     n_secret = train_pd[secret_tag].nunique()
 
     config.n_utility = n_utility  # depends on dataset
     config.n_sensitive = n_secret  # depends on dataset
-    config.size = 224  # depends on dataset
+    # config.size = 224  # depends on dataset
     if config.BATCH_SIZE == 0:
         config.BATCH_SIZE = 32
     if config.LEARNING_RATE == 0:
@@ -600,7 +636,13 @@ def get_dataloaders_image(config,train_pd, val_pd, test_pd, sampler=True, secret
     train_sampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, len(train_weights))
 
     composed = torchvision.transforms.Compose([ColorizeToPIL(),
-                                               Resize((config.size, config.size), interpolation=2), ToTensor(), ])
+                                               Resize((resize, resize), interpolation=2),
+                                               RandomHorizontalFlip(),RandomVerticalFlip(),
+                                               RandomRotation(180),
+                                               ToTensor(), ])
+
+    composed_test = torchvision.transforms.Compose([ColorizeToPIL(),
+                                               Resize((resize, resize), interpolation=2), ToTensor(), ])
 
     if sampler:
         train_dataloader = DataLoader(ImageDataset(pd=train_pd, utility_tag='utility_cat',
@@ -622,14 +664,15 @@ def get_dataloaders_image(config,train_pd, val_pd, test_pd, sampler=True, secret
                                 shuffle=shuffle_val, num_workers=config.n_dataloader, pin_memory=True)
 
     test_dataloader = DataLoader(ImageDataset(pd=test_pd, utility_tag='utility_cat',
-                                              secret_tag='secret_cat',
-                                              transform=composed),
+                                              secret_tag='secret_cat',transform=composed_test),
                                  batch_size=config.BATCH_SIZE,
-                                 shuffle=True, num_workers=config.n_dataloader, pin_memory=True)
+                                 shuffle=False, num_workers=config.n_dataloader, pin_memory=True)
 
     ### NETWORK BIG #### config.size = 224
-    classifier_network = VanillaNet(config.n_utility, body=models.densenet121(pretrained=True),
-                                    feature_dim=1000).to(config.DEVICE)
+    # classifier_network = VanillaNet(config.n_utility, body=models.densenet121(pretrained=True),
+                                    # feature_dim=1000).to(config.DEVICE)
+
+    classifier_network = VanillaNet(config.n_utility, body=MyDenseBody()).to(config.DEVICE)
 
     # print(classifier_network)
 

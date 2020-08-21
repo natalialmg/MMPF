@@ -4,4 +4,4 @@ from .network_heads import *
 import sys
 sys.path.append(".")
 sys.path.append("..")
-from MinimaxParetoFair import *
+from MMPF.MinimaxParetoFair import *

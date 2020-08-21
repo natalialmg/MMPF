@@ -183,32 +183,20 @@ def get_pandas_data(x_gen, a_gen, y_gen, ratios=[0.6, 0.2, 0.2]):
 
     return train_pd, val_pd, test_pd
 
-
-def get_dataloaders_pdtable(train_pd, val_pd, test_pd, sampler=True, cov_tags=['x'], sensitive_tag='s',
-                            utility_tag='y', balanced_tag='s', batch_size=32,
-                            n_dataloader=32, shuffle_train=True, shuffle_val=False, regression=False):
+def get_dataloaders_pdtable(train_pd,val_pd,test_pd, sampler=True,cov_tags = ['x'], sensitive_tag='s',
+                            utility_tag='y', balanced_tag='s',batch_size = 32, n_dataloader = 32,shuffle_train=True,shuffle_val=False):
     from .misc import get_weight_dict
 
     n_utility = train_pd[utility_tag].nunique()
     n_sensitive = train_pd[sensitive_tag].nunique()
-    print('HERE', train_pd[sensitive_tag].nunique())
-    if train_pd[sensitive_tag].nunique() > 1:
-        train_pd['sensitive_cat'] = train_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
-        test_pd['sensitive_cat'] = test_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
-        val_pd['sensitive_cat'] = val_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
-    else:
-        train_pd.loc[:, 'sensitive_cat'] = 1
-        test_pd.loc[:, 'sensitive_cat'] = 1
-        val_pd.loc[:, 'sensitive_cat'] = 1
 
-    if not regression:
-        train_pd['utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-        test_pd['utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-        val_pd['utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
-    else:
-        train_pd.loc[:, 'utility_cat'] = train_pd[utility_tag]
-        test_pd.loc[:, 'utility_cat'] = test_pd[utility_tag]
-        val_pd.loc[:, 'utility_cat'] = val_pd[utility_tag]
+    train_pd['sensitive_cat'] = train_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+    test_pd['sensitive_cat'] = test_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+    val_pd['sensitive_cat'] = val_pd[sensitive_tag].apply(lambda x: to_categorical(x, num_classes=n_sensitive))
+
+    train_pd['utility_cat'] = train_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    test_pd['utility_cat'] = test_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
+    val_pd['utility_cat'] = val_pd[utility_tag].apply(lambda x: to_categorical(x, num_classes=n_utility))
 
     # get prior of subgroups
     config.p_sensitive = train_pd['sensitive_cat'].mean()
@@ -227,11 +215,11 @@ def get_dataloaders_pdtable(train_pd, val_pd, test_pd, sampler=True, cov_tags=['
                                       batch_size=batch_size,
                                       sampler=train_sampler, num_workers=n_dataloader, pin_memory=True)
     else:
-        train_dataloader = DataLoader(TablePandasDataset(pd=train_pd, cov_list=cov_tags,
-                                                         utility_tag='utility_cat', sensitive_tag='sensitive_cat',
+        train_dataloader = DataLoader(TablePandasDataset(pd=train_pd,cov_list = cov_tags,
+                                                         utility_tag = 'utility_cat', sensitive_tag = 'sensitive_cat',
                                                          transform=composed),
-                                      batch_size=batch_size,
-                                      shuffle=shuffle_train, num_workers=n_dataloader, pin_memory=True)
+                                    batch_size=batch_size,
+                                    shuffle=shuffle_train, num_workers=n_dataloader, pin_memory = True)
 
     val_dataloader = DataLoader(TablePandasDataset(pd=val_pd, cov_list=cov_tags,
                                                    utility_tag='utility_cat', sensitive_tag='sensitive_cat',
@@ -246,6 +234,7 @@ def get_dataloaders_pdtable(train_pd, val_pd, test_pd, sampler=True, cov_tags=['
                                  shuffle=False, num_workers=n_dataloader, pin_memory=True)
 
     return train_dataloader, val_dataloader, test_dataloader
+
 
 def synthetic_samples_ybin_xgmm(param_pa, param_pxa, param_pyxa, seed=42, n_samples=10000, verbose = False, ratios = [0.6, 0.2, 0.2]):
     print(param_pa, param_pyxa, param_pxa)
@@ -276,14 +265,15 @@ def synthetic_samples_ybin_xgmm(param_pa, param_pxa, param_pyxa, seed=42, n_samp
     return train_pd, val_pd, test_pd
 
 
-def make_classifier(config, resnet=True, gate=F.relu):
+def make_classifier(config,seed = None,resnet = True):
+
     ## NETWORK ##
     # if seed is None:
     #     torch.manual_seed(config.seed)
     # else:
     #     torch.manual_seed(seed)
 
-    if config.shidden == '':
+    if config.shidden == '' :
         hidden_units = ()
     else:
         hidden_units = make_tuple(config.shidden)
@@ -295,11 +285,11 @@ def make_classifier(config, resnet=True, gate=F.relu):
         classifier_network = VanillaNet(config.n_utility,
                                         FCResnetBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
                                                      residual_depth=2,
-                                                     gate=gate))
+                                               gate=F.relu))
     else:
         classifier_network = VanillaNet(config.n_utility,
                                         FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
-                                               gate=gate, use_batchnorm=config.batchnorm))
+                                                   gate=F.relu))
 
     print(classifier_network)
 

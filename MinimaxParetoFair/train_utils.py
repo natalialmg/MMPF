@@ -75,7 +75,6 @@ def epoch_training_linearweight(
     sensitive_values = []
 
     if train_type == 'Train':
-
         ## list of travelling mean objects -> in each batch updates the current epoch mean, at the end we have the mean of the epoch
         full_loss = TravellingMean()
         classifier_network = classifier_network.train()
@@ -241,7 +240,7 @@ def adaptive_optimizer(train_dataloader, val_dataloader,
                 lrdecay = config.lrdecay + 0 #reset lrdecay
                 epoch_best = epoch + 1
 
-            if stopper.best_loss < full_loss_val[epoch]:
+            if (stopper.best_loss < full_loss_val[epoch]):
                 model_params_load(config.best_adaptive_network_path, classifier_network, optimizer, config.DEVICE) #loading best last
                 optimizer.param_groups[0]['lr'] *= lrdecay #apply lrdecay
                 lrdecay *= config.lrdecay #update lrdecay

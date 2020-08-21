@@ -1,4 +1,5 @@
 from .network_utils import *
+from torchvision import models
 
 class ConvStackBody(nn.Module):
     def __init__(self, in_channels=4, in_w=32, in_h=32,
@@ -76,6 +77,8 @@ class FCBody(nn.Module):
 
         return x
 
+
+
 # class FCResnetLayer(nn.Module):
 #     def __init__(self, state_dim, hidden_unit=64, gate=F.relu, residual_depth=None):
 #         super(FCResnetLayer, self).__init__()
@@ -151,3 +154,66 @@ class DummyBody(nn.Module):
 
     def forward(self, x):
         return x
+
+
+class MyDenseBody(nn.Module):
+    def __init__(self,typenet = 'densenet'):
+        super(MyDenseBody, self).__init__()
+        if typenet == 'resnet':
+            self.body = models.resnet34(pretrained=True)
+            self.fc_layer = nn.Linear(512, 64) #512 is resnet34 output
+            self.bn_layer = nn.BatchNorm1d(64, momentum=0.5)
+            self.feature_dim = 64
+
+        else:
+            self.body = models.densenet121(pretrained=True)
+            self.feature_dim = 1024
+        self.type = typenet
+
+    def forward(self, x):
+
+        if self.type == 'resnet':
+            x = self.body.conv1(x)
+            x = self.body.bn1(x)
+            x = self.body.relu(x)
+            x = self.body.maxpool(x)
+
+            x = self.body.layer1(x)
+            x = self.body.layer2(x)
+            x = self.body.layer3(x)
+            x = self.body.layer4(x)
+
+            x = F.relu(x)
+            x = self.body.avgpool(x)
+            x =  torch.flatten(x, 1)
+            x = self.fc_layer(x)
+            x = self.bn_layer(x)
+            out = F.relu(x)
+            # out = torch.flatten(x, 1)
+        else:
+            out = self.body.features(x)
+            out = F.relu(out, inplace=True)
+            out = F.adaptive_avg_pool2d(out, (1, 1))
+            out = torch.flatten(out, 1)
+
+        return out
+
+    def features(self, x):
+
+        if self.type == 'resnet':
+            x = self.body.conv1(x)
+            x = self.body.bn1(x)
+            x = self.body.relu(x)
+            x = self.body.maxpool(x)
+
+            x = self.body.layer1(x)
+            x = self.body.layer2(x)
+            x = self.body.layer3(x)
+            out = self.body.layer4(x)
+
+        else:
+            out = self.body.features(x)
+
+        return out
+
+
