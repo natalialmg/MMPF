@@ -1,5 +1,7 @@
 # Minimax Pareto Fairness
-This repo contains code accompaning the submission "Minimax Pareto Fairness: A Multi Objective Perspective."
+This repo contains code accompaning the submission "Minimax Pareto Fairness: A Multi Objective Perspective" presented @ICML2020 :
+https://proceedings.icml.cc/static/paper_files/icml/2020/1084-Paper.pdf
+
 It includes the core code for the Approximate Projection onto Star-convex sets (APStar), and an integration of this algorithm with Pytorch and SKLearn.
   
 To run Minimax Pareto Fairnes on the Adult Dataset (Dua, D. and Graff, C. (2019).) dataset, controlling for race and age simultaneously, execute:
