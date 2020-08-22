@@ -65,10 +65,10 @@ def make_defconfig():
                         help='base directory to store classifier')
 
     # Pareto-optimality options
-    config.add_argument('--patience', action='store', default=20, type=int, dest='patience',
+    config.add_argument('--patience', action='store', default=10, type=int, dest='patience',
                         help='epoch patience parameter inside adaptive optimization')
     config.add_argument('--mu_init', action='store', default='', type=str, dest='mu_init', help='initial mu penalty')
-    config.add_argument('--loss_type', action='store', default=0, type=int, dest='type_loss',
+    config.add_argument('--loss_type', action='store', default=2, type=int, dest='type_loss',
                         help='0: CrossEntropy, 1: L1 2:Brier score (Categorical MSE)')
     config.add_argument('--sampler', action='store', default=True, type=lambda x: bool(strtobool(x)), dest='sampler',
                         help='boolean: activate discrimination penalty')

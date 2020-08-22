@@ -13,6 +13,6 @@ from MMPF.MinimaxParetoFair.torch_utils import *
 from MMPF.MinimaxParetoFair.train_utils import *
 from MMPF.MinimaxParetoFair.dataset_loaders import *
 from MMPF.MinimaxParetoFair.MMPF_trainer import *
-from MMPF.MinimaxParetoFair.syntheticdata_utils_REVIEW import *
+from MMPF.MinimaxParetoFair.synthetic_data_utils import *
 from MMPF.MinimaxParetoFair.network import *
 from MMPF.MinimaxParetoFair.postprocessing import *

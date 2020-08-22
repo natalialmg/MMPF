@@ -6,10 +6,11 @@ from scipy.stats import bernoulli,norm
 import torch
 # from .network import *
 from torch.utils.data import Dataset, DataLoader
-# sys.path.append(".")
-# sys.path.append("..")
 import matplotlib.pyplot as plt
 from ast import literal_eval as make_tuple
+sys.path.append(".")
+sys.path.append("..")
+# from network import *
 
 def get_bs_optimal(x_array, p_xa, p_yxa, mua, type = 'MSE'):
     ##########################

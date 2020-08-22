@@ -4,7 +4,7 @@ from . import *
 import sys
 from scipy.stats import bernoulli,norm
 import torch
-from MinimaxParetoFair.network import *
+# from MinimaxParetoFair.network import *
 from torch.utils.data import Dataset, DataLoader
 sys.path.append(".")
 sys.path.append("..")
@@ -440,34 +440,34 @@ def synthetic_samples_ybin_xgmm(param_pa, param_pxa, param_pyxa, seed=42, n_samp
 
     return train_pd, val_pd, test_pd
 
-def make_classifier(config,resnet = True,residual_depth= 2, gate = F.elu):
-
-    ## NETWORK ##
-    # if seed is None:
-    #     torch.manual_seed(config.seed)
-    # else:
-    #     torch.manual_seed(seed)
-
-    if config.shidden == '' :
-        hidden_units = ()
-    else:
-        hidden_units = make_tuple(config.shidden)
-
-    # classifier_network = VanillaNet(config.n_utility,
-    #                                 FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
-    #                                            gate=F.relu)).to(config.DEVICE)
-    if resnet:
-        classifier_network = VanillaNet(config.n_utility,
-                                        FCResnetBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
-                                                     residual_depth=residual_depth,
-                                               gate=gate,use_batchnorm=config.batchnorm))
-    else:
-        classifier_network = VanillaNet(config.n_utility,
-                                        FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
-                                                   gate=gate,use_batchnorm=config.batchnorm))
-
-    print(classifier_network)
-
-    return classifier_network
+# def make_classifier(config,resnet = True,residual_depth= 2, gate = F.elu):
+#
+#     ## NETWORK ##
+#     # if seed is None:
+#     #     torch.manual_seed(config.seed)
+#     # else:
+#     #     torch.manual_seed(seed)
+#
+#     if config.shidden == '' :
+#         hidden_units = ()
+#     else:
+#         hidden_units = make_tuple(config.shidden)
+#
+#     # classifier_network = VanillaNet(config.n_utility,
+#     #                                 FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
+#     #                                            gate=F.relu)).to(config.DEVICE)
+#     if resnet:
+#         classifier_network = VanillaNet(config.n_utility,
+#                                         FCResnetBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
+#                                                      residual_depth=residual_depth,
+#                                                gate=gate,use_batchnorm=config.batchnorm))
+#     else:
+#         classifier_network = VanillaNet(config.n_utility,
+#                                         FCBody(state_dim=len(config.cov_tags), hidden_units=hidden_units,
+#                                                    gate=gate,use_batchnorm=config.batchnorm))
+#
+#     print(classifier_network)
+#
+#     return classifier_network
 
 
