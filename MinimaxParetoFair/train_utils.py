@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 from torch import optim
-from .misc import *
-from .losses import *
-from .torch_utils import *
+from MinimaxParetoFair.misc import *
+from MinimaxParetoFair.losses import *
+from MinimaxParetoFair.torch_utils import *
 import pandas as pd
 
 

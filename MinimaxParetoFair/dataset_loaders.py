@@ -2,20 +2,20 @@ import pandas as pd
 import numpy as np
 # from . import *
 import sys, os
-sys.path.append(".")
-sys.path.append("..")
+# sys.path.append(".")
+# sys.path.append("..")
 # from MinimaxParetoFair.network import *
 
-from MinimaxParetoFair import *
-from .dataloader_utils import *
+# from MinimaxParetoFair import *
+from MinimaxParetoFair.dataloader_utils import *
 import torchvision
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torchvision.transforms import Resize, ToPILImage, ToTensor,RandomHorizontalFlip,RandomVerticalFlip, RandomRotation, RandomAffine
 from torchvision import models
-from .misc import *
-from .network import *
+from MinimaxParetoFair.misc import *
+from MinimaxParetoFair.network import *
 
 # from .synthetic_data_loaders import *
 from ast import literal_eval as make_tuple

@@ -11,7 +11,7 @@ import torch
 import logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s')
-from .misc import *
+from MinimaxParetoFair.misc import *
 
 class Logger(object):
     def __init__(self, vanilla_logger, log_dir, log_level=0):

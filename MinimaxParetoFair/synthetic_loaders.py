@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from . import *
 import sys
-sys.path.append(".")
-sys.path.append("..")
+# sys.path.append(".")
+# sys.path.append("..")
 from MinimaxParetoFair.network import *
 import torchvision
 import torch

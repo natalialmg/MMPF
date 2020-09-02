@@ -4,13 +4,14 @@ import torch, sys, pickle, os
 from distutils.util import strtobool
 
 import sys
-sys.path.append(".")
-sys.path.append("..")
+# sys.path.append(".")
+# sys.path.append("..")
 from MinimaxParetoFair import *
 # from dataset_loaders import *
 # from MMPF_trainer import *
 # from postprocessing import *
-import postprocessing
+# import .postprocessing
+from MinimaxParetoFair.postprocessing import *
 from ast import literal_eval as make_tuple
 
 def main():

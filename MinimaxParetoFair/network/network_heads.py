@@ -1,9 +1,10 @@
 import torch.nn as nn
 from .network_utils import *
 from .network_bodies import *
+from MinimaxParetoFair.torch_utils import tensor
 import sys
-sys.path.append(".")
-sys.path.append("..")
+# sys.path.append(".")
+# sys.path.append("..")
 # from MinimaxParetoFair import *
 
 class VanillaNet(nn.Module, BaseNet):

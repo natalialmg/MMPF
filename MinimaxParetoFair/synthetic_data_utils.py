@@ -1,6 +1,7 @@
 
 import numpy as np
-from . import *
+from MinimaxParetoFair import *
+from MinimaxParetoFair.dataloader_utils import to_categorical, TablePandasDataset
 import sys
 from scipy.stats import bernoulli,norm
 import torch
@@ -8,8 +9,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from ast import literal_eval as make_tuple
-sys.path.append(".")
-sys.path.append("..")
+# sys.path.append(".")
+# sys.path.append("..")
 # from network import *
 
 def get_bs_optimal(x_array, p_xa, p_yxa, mua, type = 'MSE'):
